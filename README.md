@@ -1,8 +1,8 @@
-# truffled-purescript
+# Truffled PureScript
 
 [Truffle](https://wiki.openjdk.java.net/display/Graal/Truffle+FAQ+and+Guidelines) is an API for writing AST interpreters on the JVM. When combined with [Graal](https://wiki.openjdk.java.net/display/Graal/Main), Truffle can partially evaluate and specialise AST nodes to generate efficient machine code.
 
-[PureScript](http://www.purescript.org/) is a small strongly typed programming language that compiles to JavaScript.
+[PureScript](http://www.purescript.org/) is a small strongly typed programming language.
 
 This project combines both together so that we can run PureScript on the JVM.
 
