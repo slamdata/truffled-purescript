@@ -8,13 +8,13 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 
 @NodeInfo(shortName = "Closure")
 public final class ClosureNode extends ExpressionNode {
-    public final Closure abs;
+    public final CallRootNode callNode;
 
-    public ClosureNode(Closure abs) {
-        this.abs = abs;
+    public ClosureNode(CallRootNode callNode) {
+        this.callNode = callNode;
     }
 
     public Object executeGeneric(VirtualFrame frame) {
-        return abs;
+        return new Closure(callNode, frame.materialize());
     }
 }

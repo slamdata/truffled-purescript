@@ -27,7 +27,7 @@ object CoreFnEval {
       case CoreFnExprAbs(arg, body) =>
         val callNode =
           new node.CallRootNode(identName(arg), rec(body), fd)
-        new node.ClosureNode(new Closure(callNode))
+        new node.ClosureNode(callNode)
 
       case CoreFnExprApp(func, arg) =>
         new node.AppNode(rec(func), rec(arg))

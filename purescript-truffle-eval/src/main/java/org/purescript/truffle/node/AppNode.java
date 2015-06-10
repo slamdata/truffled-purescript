@@ -1,7 +1,6 @@
 package org.purescript.truffle.node;
 
 import com.oracle.truffle.api.Truffle;
-import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.DirectCallNode;
@@ -25,15 +24,14 @@ public final class AppNode extends ExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
-        final Closure abs;
+        final Closure closure;
         try {
-            abs = func.executeClosure(frame);
+            closure = func.executeClosure(frame);
         } catch (UnexpectedResultException e) {
             throw new PureScriptException("Expression did not result in a function");
         }
-        final DirectCallNode callNode = Truffle.getRuntime().createDirectCallNode(abs.callTarget);
-        final MaterializedFrame materializedFrame = frame.materialize();
-        final Object[] args = new Object[] { materializedFrame, arg.executeGeneric(frame) };
+        final DirectCallNode callNode = Truffle.getRuntime().createDirectCallNode(closure.callTarget);
+        final Object[] args = new Object[] { closure.frame, arg.executeGeneric(frame) };
         return callNode.call(frame, args);
     }
 }
