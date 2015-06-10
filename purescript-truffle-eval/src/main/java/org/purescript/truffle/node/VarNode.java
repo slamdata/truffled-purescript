@@ -28,7 +28,9 @@ public class VarNode extends ExpressionNode {
             final FrameSlot slot = lookupFrame.getFrameDescriptor().findFrameSlot(name);
             if (slot != null) {
                 value = lookupFrame.getValue(slot);
-                break;
+                if (value != null) {
+                    break;
+                }
             }
 
             Object[] args = lookupFrame.getArguments();
