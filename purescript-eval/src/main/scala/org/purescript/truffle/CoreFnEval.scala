@@ -1,6 +1,5 @@
 package org.purescript.truffle
 
-import argonaut.Parse
 import com.oracle.truffle.api.Truffle
 import com.oracle.truffle.api.frame.{ Frame, FrameDescriptor, FrameSlot, MaterializedFrame }
 
@@ -44,7 +43,7 @@ object CoreFnEval {
     }
   }
 
-  def loadModule(mf: MaterializedFrame)(cfm: CoreFnModule) = {
+  def loadModule(mf: MaterializedFrame, cfm: CoreFnModule) = {
     val qualify = (i: CoreFnIdent) => CoreFnQualifiedIdent(Some(cfm.name), i)
     val vf = Truffle.getRuntime.createVirtualFrame(Array.empty, FrameDescriptor.create)
     val fd = vf.getFrameDescriptor
@@ -71,14 +70,10 @@ object CoreFnEval {
     }
   }
 
-  def evaluate(content: String) = {
-    val result = Parse.decodeEither[CoreFnModule](content)
-
+  def evaluate(m: CoreFnModule) = {
     val vf = Truffle.getRuntime.createVirtualFrame(Array.empty, FrameDescriptor.create)
     val mf = vf.materialize()
-
-    result.foreach(loadModule(mf))
-
-    result.map(_ => mf)
+    loadModule(mf, m)
+    mf
   }
 }
