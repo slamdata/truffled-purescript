@@ -2,14 +2,20 @@ package org.purescript.truffle;
 
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.RootCallTarget;
-import com.oracle.truffle.api.frame.FrameDescriptor;
-import com.oracle.truffle.api.frame.FrameSlot;
-import com.oracle.truffle.api.nodes.NodeInfo;
+
+import org.purescript.truffle.node.CallRootNode;
 
 public final class Closure {
+    public final CallRootNode callNode;
     public final RootCallTarget callTarget;
 
-    public Closure(RootCallTarget callTarget) {
-        this.callTarget = callTarget;
+    public Closure(CallRootNode callNode) {
+        this.callNode = callNode;
+        this.callTarget = Truffle.getRuntime().createCallTarget(callNode);
+    }
+
+    @Override
+    public String toString() {
+        return "(" + callNode + ")";
     }
 }

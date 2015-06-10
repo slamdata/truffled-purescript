@@ -28,4 +28,9 @@ public class CallRootNode extends RootNode {
         frame.setObject(slot, frame.getArguments()[1]);
         return body.executeGeneric(frame);
     }
+
+    @Override
+    public String toString() {
+        return "\\" + name + " -> " + body;
+    }
 }

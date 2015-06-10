@@ -44,4 +44,9 @@ public class VarNode extends ExpressionNode {
         }
         return value;
     }
+
+    @Override
+    public String toString() {
+        return name;
+    }
 }
