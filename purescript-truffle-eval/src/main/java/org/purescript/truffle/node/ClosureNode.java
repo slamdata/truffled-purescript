@@ -17,4 +17,9 @@ public final class ClosureNode extends ExpressionNode {
     public Object executeGeneric(VirtualFrame frame) {
         return new Closure(callNode, frame.materialize());
     }
+
+    @Override
+    public String toString() {
+        return callNode.toString();
+    }
 }
