@@ -40,6 +40,12 @@ object CoreFnEval {
           case CoreFnLiteralDouble(d) =>
             new node.DoubleLiteralNode(d)
         }
+
+      case CoreFnExprConstructor(name, fields) =>
+        val fieldNames = fields.map(identName)
+        fieldNames.foldRight[node.ExpressionNode](new node.TaggedNode(name, fieldNames.toArray)) { (field, n) =>
+          new node.ClosureNode(new node.CallRootNode(field, n, fd))
+        }
     }
   }
 

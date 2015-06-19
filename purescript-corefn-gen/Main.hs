@@ -84,6 +84,12 @@ jsonExpr (Case ann es as) =
            , "exprs" J..= (jsonExpr <$> es)
            , "alternatives" J..= (jsonAlternative <$> as)
            ]
+jsonExpr (Constructor ann tn cn fns) =
+  J.object [ "tag" J..= ("constructor" :: J.Value)
+           , "typeName" J..= runProperName tn
+           , "constructor-name" J..= runProperName cn
+           , "field-names" J..= (jsonIdent <$> fns)
+           ]
 
 jsonAlternative :: CaseAlternative Ann -> J.Value
 jsonAlternative (CaseAlternative bs r) =

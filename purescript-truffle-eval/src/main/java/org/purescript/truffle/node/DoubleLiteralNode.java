@@ -21,4 +21,9 @@ public final class DoubleLiteralNode extends ExpressionNode {
     public Object executeGeneric(VirtualFrame frame) {
         return value;
     }
+
+    @Override
+    public String toString() {
+        return Double.toString(value);
+    }
 }

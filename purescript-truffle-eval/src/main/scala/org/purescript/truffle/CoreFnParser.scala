@@ -52,6 +52,7 @@ case class CoreFnExprApp(func: CoreFnExpr, arg: CoreFnExpr) extends CoreFnExpr
 case class CoreFnExprAbs(arg: CoreFnIdent, body: CoreFnExpr) extends CoreFnExpr
 case class CoreFnExprVar(ident: CoreFnQualifiedIdent) extends CoreFnExpr
 case class CoreFnExprLiteral(ident: CoreFnLiteral) extends CoreFnExpr
+case class CoreFnExprConstructor(name: String, fieldNames: List[CoreFnIdent]) extends CoreFnExpr
 
 object CoreFnExpr {
   implicit val coreFnExprDecodeJson: DecodeJson[CoreFnExpr] =
@@ -72,6 +73,11 @@ object CoreFnExpr {
           (c --\ "ident").as[CoreFnQualifiedIdent].map(CoreFnExprVar)
         case "literal" =>
           (c --\ "literal").as[CoreFnLiteral].map(CoreFnExprLiteral)
+        case "constructor" =>
+          for {
+            constructorName <- (c --\ "constructor-name").as[String]
+            fieldNames <- (c --\ "field-names").as[List[CoreFnIdent]]
+          } yield CoreFnExprConstructor(constructorName, fieldNames)
       }
     }
 }
