@@ -17,6 +17,7 @@ let purescript =
       bower-json
       boxes
       optparse-applicative
+      parsec
       pattern-arrows
       safe
       semigroups
@@ -28,6 +29,8 @@ in
 
 runCommand "dummy" {
   buildInputs = [
+    oraclejdk8
+    (sbt.override { jre = oraclejre8; })
     (haskell.packages.ghc7101.ghcWithPackages (pkgs: [
       pkgs.aeson
       purescript

@@ -1,4 +1,4 @@
-name := "purescript-eval"
+name := "purescript-truffle-eval"
 
 resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
