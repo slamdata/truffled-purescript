@@ -6,26 +6,33 @@ module Main where
 import qualified Data.Aeson as J
 import qualified Data.ByteString.Lazy.Char8 as BSL
 
-import Control.Monad.Trans.Reader (ReaderT(), runReaderT)
+import Control.Monad.Supply (runSupplyT)
 import Control.Monad.Trans.Writer (WriterT(), runWriterT)
 import Data.Foldable (traverse_)
-import Language.PureScript (compile)
 import Language.PureScript.AST.Declarations (ImportDeclarationType(..), Declaration(..), Module(..))
 import Language.PureScript.CoreFn.Ann (Ann())
 import Language.PureScript.CoreFn.Binders (Binder(..))
+import Language.PureScript.CoreFn.Desugar (moduleToCoreFn)
 import Language.PureScript.CoreFn.Expr (Bind(..), CaseAlternative(..), Expr(..))
 import Language.PureScript.CoreFn.Literals (Literal(..))
+import Language.PureScript.CoreFn.Meta (ConstructorType(..), Meta(..))
+import Language.PureScript.Environment (initEnvironment)
 import Language.PureScript.Errors (MultipleErrors())
+import Language.PureScript.Linter (lint)
+import Language.PureScript.Linter.Exhaustive (checkExhaustiveModule)
 import Language.PureScript.Names
-import Language.PureScript.Options
-import Language.PureScript.Parser
+import Language.PureScript.Parser (parseModulesFromFiles)
+import Language.PureScript.Sugar (desugar)
+import Language.PureScript.Sugar.BindingGroups (createBindingGroups, collapseBindingGroups)
+import Language.PureScript.TypeChecker (typeCheckModule)
+import Language.PureScript.TypeChecker.Monad (runCheck')
 import System.Environment (getArgs)
 import qualified Language.PureScript.CoreFn.Module as CFM
 
 addDefaultImport :: ModuleName -> Module -> Module
-addDefaultImport toImport m@(Module coms mn decls exps)  =
+addDefaultImport toImport m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
+  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
   where
   isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
@@ -37,14 +44,40 @@ importPrim = addDefaultImport (ModuleName [ProperName "Prim"])
 importPrelude :: Module -> Module
 importPrelude = addDefaultImport (ModuleName [ProperName "Prelude"])
 
-compileModules :: [(String, String)] -> ReaderT (Options 'Compile) (WriterT MultipleErrors (Either MultipleErrors)) [CFM.Module Ann]
+compileModules :: [(String, String)] -> Either MultipleErrors [CFM.Module Ann]
 compileModules moduleFiles = do
-  r <- parseModulesFromFiles id moduleFiles
-  fmap (\(a, _, _, _) -> a) . compile $ fmap snd r
+  ms <- parseModulesFromFiles id moduleFiles
+  traverse (f . snd) ms
+    where
+      f :: Module -> Either MultipleErrors (CFM.Module Ann)
+      f m@(Module _ _ moduleName _ _) = evalWriterT $ do
+        let env = initEnvironment
+        lint m
+        ([desugared], _) <- runSupplyT 0 $ desugar [] [m]
+        (checked@(Module ss coms _ elaborated exps), env') <- runCheck' env $ typeCheckModule desugared
+        checkExhaustiveModule env' checked
+        regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
+        let mod' = Module ss coms moduleName regrouped exps
+        return $ moduleToCoreFn env' mod'
+
+runConstructorType :: ConstructorType -> String
+runConstructorType ProductType = "product-type"
+runConstructorType SumType = "sum-type"
+
+jsonMeta :: Meta -> J.Value
+jsonMeta (IsConstructor ct fields) =
+  J.object [ "tag" J..= ("is-constructor" :: J.Value)
+           , "constructor-type" J..= runConstructorType ct
+           , "fields" J..= (jsonIdent <$> fields)
+           ]
+jsonMeta IsNewtype =
+  J.object [ "tag" J..= ("is-newtype" :: J.Value)
+           ]
 
 jsonAnn :: Ann -> J.Value
 jsonAnn (sp, cs, tys, ms) =
-  J.object []
+  J.object [ "meta" J..= (jsonMeta <$> ms)
+           ]
 
 jsonLiteral :: Literal (Expr Ann) -> J.Value
 jsonLiteral (StringLiteral s) =
@@ -66,7 +99,7 @@ jsonExpr (App ann func arg) =
 jsonExpr (Var ann ident) =
   J.object [ "tag" J..= ("var" :: J.Value)
            -- , "ann" J..= jsonAnn ann
-           , "ident" J..= jsonQualified ident
+           , "ident" J..= jsonQualified jsonIdent ident
            ]
 jsonExpr (Literal ann lit) =
   J.object [ "tag" J..= ("literal" :: J.Value)
@@ -102,18 +135,27 @@ jsonAlternative (CaseAlternative bs r) =
                               ]
 
 jsonBinder :: Binder Ann -> J.Value
-jsonBinder (NullBinder _) =
+jsonBinder (NullBinder ann) =
   J.object [ "tag" J..= ("null" :: J.Value)
+           , "ann" J..= jsonAnn ann
            ]
-jsonBinder (VarBinder _ ident) =
+jsonBinder (VarBinder ann ident) =
   J.object [ "tag" J..= ("var" :: J.Value)
+           , "ann" J..= jsonAnn ann
            , "ident" J..= jsonIdent ident
+           ]
+jsonBinder (ConstructorBinder ann typeName constructorName binders) =
+  J.object [ "tag" J..= ("constructor" :: J.Value)
+           , "ann" J..= jsonAnn ann
+           , "type-name" J..= jsonQualified (J.toJSON . runProperName) typeName
+           , "constructor-name" J..= jsonQualified (J.toJSON . runProperName) constructorName
+           , "binders" J..= (jsonBinder <$> binders)
            ]
 
-jsonQualified :: Qualified Ident -> J.Value
-jsonQualified (Qualified mn ident) =
+jsonQualified :: (a -> J.Value) -> Qualified a -> J.Value
+jsonQualified f (Qualified mn a) =
   J.object [ "module-name" J..= (jsonModuleName <$> mn)
-           , "ident" J..= jsonIdent ident
+           , "value" J..= f a
            ]
 
 jsonIdent :: Ident -> J.Value
@@ -153,11 +195,8 @@ dumpModules = traverse_ (BSL.putStrLn . J.encode . jsonModule)
 evalWriterT :: Functor m => WriterT w m a -> m a
 evalWriterT = fmap fst . runWriterT
 
-runPSC :: ReaderT (Options 'Compile) (WriterT MultipleErrors (Either MultipleErrors)) a -> Either MultipleErrors a
-runPSC = evalWriterT . flip runReaderT defaultCompileOptions
-
 main :: IO ()
 main = do
   files <- getArgs
   contents <- traverse readFile files
-  either print dumpModules . runPSC . compileModules $ zip files contents
+  either print dumpModules . compileModules $ zip files contents
